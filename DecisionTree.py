@@ -1,5 +1,5 @@
 '''
-Contains the classes DecisionTreeClassifier and DecisionTreeRegressor.
+Contains the classes DecisionTree used for classification or regression learning.
 '''
 
 import numpy as np
@@ -18,12 +18,15 @@ class Node():
     def is_leaf(self):
         return self.value is not None
 
-class DecisionTreeClassifier():
-    def __init__(self, max_depth=100, min_samples_split=2, thresh=0.1):
+class DecisionTree():
+    def __init__(self, max_depth=100, min_samples_split=2, mode = 'classification'):
+        if mode not in {'classification', 'regression'}:
+            raise('Mode must be either classification or regression')
+        
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
-        self.thresh=thresh
         self.root = None
+        self.mode = mode
 
     def _split(self, X, thresh):
         '''
@@ -57,6 +60,15 @@ class DecisionTreeClassifier():
             (n_right / n) * self._entropy(Y[right_idx])
         
         return parent_loss - child_loss
+    
+    def _variance_reduction(self, X, Y, thresh):
+        'Splitting criteria for regression'
+        left_idx, right_idx = self._split(X, thresh)
+        left_weight = len(left_idx) / len(Y)
+        left_score = left_weight*np.var(Y[left_idx]) if len(Y[left_idx] > 0) else 0
+        right_weight = len(right_idx) / len(Y)
+        right_score = right_weight*np.var(Y[right_idx]) if len(Y[right_idx] > 0) else 0
+        return np.var(Y) - (left_score + right_score)
 
     def _optimal_split(self, X, Y, features):
         '''
@@ -73,7 +85,10 @@ class DecisionTreeClassifier():
             X_feat = X[:,feat]
             threshold_vals = np.unique(X_feat)
             for thresh in threshold_vals:
-                inf = self._information_gain(X_feat,Y, thresh)
+                if (self.mode == 'classification'):
+                    inf = self._information_gain(X_feat,Y, thresh)
+                else:
+                    inf = self._variance_reduction(X_feat, Y, thresh)
 
                 if (inf > optimal_split['inf']):
                     optimal_split['inf'] = inf
@@ -103,7 +118,10 @@ class DecisionTreeClassifier():
 
         # Base case
         if self._stop_criteria(depth):
-            value = np.argmax(np.bincount(Y))
+            if (self.mode == 'classification'):
+                value = np.argmax(np.bincount(Y))
+            else:
+                value = np.mean(Y)
             return Node(value=value)
 
         # Shuffle features
@@ -157,7 +175,3 @@ class DecisionTreeClassifier():
 
     def printTree(self):
         self._do_printTree(self.root, tab=0)
-
-
-class DecisionRegressor():
-    pass
